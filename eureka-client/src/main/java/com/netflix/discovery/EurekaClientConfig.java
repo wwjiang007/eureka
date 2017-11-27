@@ -284,6 +284,16 @@ public interface EurekaClientConfig {
     boolean shouldRegisterWithEureka();
 
     /**
+     * Indicates whether the client should explicitly unregister itself from the remote server
+     * on client shutdown.
+     * 
+     * @return true if this instance should unregister with eureka on client shutdown, false otherwise
+     */
+    default boolean shouldUnregisterOnShutdown() {
+        return true;
+    }
+
+    /**
      * Indicates whether or not this instance should try to use the eureka
      * server in the same zone for latency and/or other reason.
      *
@@ -508,6 +518,18 @@ public interface EurekaClientConfig {
      * @return true or false for whether local status updates should be updated to remote servers on-demand
      */
     boolean shouldOnDemandUpdateStatusChange();
+
+    /**
+     * If set to true, the {@link EurekaClient} initialization should throw an exception at constructor time
+     * if an initial registration to the remote servers is unsuccessful.
+     *
+     * Note that if {@link #shouldRegisterWithEureka()} is set to false, then this config is a no-op
+     *
+     * @return true or false for whether the client initialization should enforce an initial registration
+     */
+    default boolean shouldEnforceRegistrationAtInit() {
+        return false;
+    }
 
     /**
      * This is a transient config and once the latest codecs are stable, can be removed (as there will only be one)

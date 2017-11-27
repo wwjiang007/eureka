@@ -55,8 +55,9 @@ public class TimedSupervisorTask extends TimerTask {
         Monitors.registerObject(name, this);
     }
 
+    @Override
     public void run() {
-        Future future = null;
+        Future<?> future = null;
         try {
             future = executor.submit(task);
             threadPoolLevelGauge.set((long) executor.getActiveCount());
@@ -64,7 +65,7 @@ public class TimedSupervisorTask extends TimerTask {
             delay.set(timeoutMillis);
             threadPoolLevelGauge.set((long) executor.getActiveCount());
         } catch (TimeoutException e) {
-            logger.error("task supervisor timed out", e);
+            logger.warn("task supervisor timed out", e);
             timeoutCounter.increment();
 
             long currentDelay = delay.get();
@@ -75,7 +76,7 @@ public class TimedSupervisorTask extends TimerTask {
             if (executor.isShutdown() || scheduler.isShutdown()) {
                 logger.warn("task supervisor shutting down, reject the task", e);
             } else {
-                logger.error("task supervisor rejected the task", e);
+                logger.warn("task supervisor rejected the task", e);
             }
 
             rejectedCounter.increment();
@@ -83,7 +84,7 @@ public class TimedSupervisorTask extends TimerTask {
             if (executor.isShutdown() || scheduler.isShutdown()) {
                 logger.warn("task supervisor shutting down, can't accept the task");
             } else {
-                logger.error("task supervisor threw an exception", e);
+                logger.warn("task supervisor threw an exception", e);
             }
 
             throwableCounter.increment();

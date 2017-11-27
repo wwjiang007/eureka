@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -150,7 +149,7 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
             }
         }
         logger.info("Finished initializing remote region registries. All known remote regions: {}",
-                Arrays.toString(allKnownRemoteRegions));
+                (Object) allKnownRemoteRegions);
     }
 
     @Override
@@ -207,6 +206,9 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                 Long existingLastDirtyTimestamp = existingLease.getHolder().getLastDirtyTimestamp();
                 Long registrationLastDirtyTimestamp = registrant.getLastDirtyTimestamp();
                 logger.debug("Existing lease found (existing={}, provided={}", existingLastDirtyTimestamp, registrationLastDirtyTimestamp);
+
+                // this is a > instead of a >= because if the timestamps are equal, we still take the remote transmitted
+                // InstanceInfo instead of the server local copy.
                 if (existingLastDirtyTimestamp > registrationLastDirtyTimestamp) {
                     logger.warn("There is an existing lease and the existing lease's dirty timestamp {} is greater" +
                             " than the one that is being registered {}", existingLastDirtyTimestamp, registrationLastDirtyTimestamp);
@@ -366,15 +368,13 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                     return false;
                 }
                 if (!instanceInfo.getStatus().equals(overriddenInstanceStatus)) {
-                    Object[] args = {
-                            instanceInfo.getStatus().name(),
-                            instanceInfo.getOverriddenStatus().name(),
-                            instanceInfo.getId()
-                    };
                     logger.info(
                             "The instance status {} is different from overridden instance status {} for instance {}. "
-                                    + "Hence setting the status to overridden status", args);
-                    instanceInfo.setStatus(overriddenInstanceStatus);
+                                    + "Hence setting the status to overridden status", instanceInfo.getStatus().name(),
+                                    instanceInfo.getOverriddenStatus().name(),
+                                    instanceInfo.getId());
+                    instanceInfo.setStatusWithoutDirty(overriddenInstanceStatus);
+
                 }
             }
             renewsLastMin.increment();
@@ -487,6 +487,7 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                     // replica start up
                     info.setOverriddenStatus(newStatus);
                     long replicaDirtyTimestamp = 0;
+                    info.setStatusWithoutDirty(newStatus);
                     if (lastDirtyTimestamp != null) {
                         replicaDirtyTimestamp = Long.valueOf(lastDirtyTimestamp);
                     }
@@ -494,9 +495,6 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                     // it to the replica's.
                     if (replicaDirtyTimestamp > info.getLastDirtyTimestamp()) {
                         info.setLastDirtyTimestamp(replicaDirtyTimestamp);
-                        info.setStatusWithoutDirty(newStatus);
-                    } else {
-                        info.setStatus(newStatus);
                     }
                     info.setActionType(ActionType.MODIFIED);
                     recentlyChangedQueue.add(new RecentlyChangedItem(lease));
@@ -549,7 +547,7 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                 InstanceStatus currentOverride = overriddenInstanceStatusMap.remove(id);
                 if (currentOverride != null && info != null) {
                     info.setOverriddenStatus(InstanceStatus.UNKNOWN);
-                    info.setStatus(newStatus);
+                    info.setStatusWithoutDirty(newStatus);
                     long replicaDirtyTimestamp = 0;
                     if (lastDirtyTimestamp != null) {
                         replicaDirtyTimestamp = Long.valueOf(lastDirtyTimestamp);
@@ -735,7 +733,7 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
         boolean includeRemoteRegion = null != remoteRegions && remoteRegions.length != 0;
 
         logger.debug("Fetching applications registry with remote regions: {}, Regions argument {}",
-                includeRemoteRegion, Arrays.toString(remoteRegions));
+                includeRemoteRegion, remoteRegions);
 
         if (includeRemoteRegion) {
             GET_ALL_WITH_REMOTE_REGIONS_CACHE_MISS.increment();
@@ -875,17 +873,14 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
         try {
             write.lock();
             Iterator<RecentlyChangedItem> iter = this.recentlyChangedQueue.iterator();
-            logger.debug("The number of elements in the delta queue is :"
-                    + this.recentlyChangedQueue.size());
+            logger.debug("The number of elements in the delta queue is : {}",
+                    this.recentlyChangedQueue.size());
             while (iter.hasNext()) {
                 Lease<InstanceInfo> lease = iter.next().getLeaseInfo();
                 InstanceInfo instanceInfo = lease.getHolder();
-                Object[] args = {instanceInfo.getId(),
-                        instanceInfo.getStatus().name(),
-                        instanceInfo.getActionType().name()};
                 logger.debug(
-                        "The instance id %s is found with status %s and actiontype %s",
-                        args);
+                        "The instance id {} is found with status {} and actiontype {}",
+                        instanceInfo.getId(), instanceInfo.getStatus().name(), instanceInfo.getActionType().name());
                 Application app = applicationInstancesMap.get(instanceInfo
                         .getAppName());
                 if (app == null) {
@@ -958,14 +953,12 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
         try {
             write.lock();
             Iterator<RecentlyChangedItem> iter = this.recentlyChangedQueue.iterator();
-            logger.debug("The number of elements in the delta queue is :" + this.recentlyChangedQueue.size());
+            logger.debug("The number of elements in the delta queue is :{}", this.recentlyChangedQueue.size());
             while (iter.hasNext()) {
                 Lease<InstanceInfo> lease = iter.next().getLeaseInfo();
                 InstanceInfo instanceInfo = lease.getHolder();
-                Object[] args = {instanceInfo.getId(),
-                        instanceInfo.getStatus().name(),
-                        instanceInfo.getActionType().name()};
-                logger.debug("The instance id %s is found with status %s and actiontype %s", args);
+                logger.debug("The instance id {} is found with status {} and actiontype {}",
+                        instanceInfo.getId(), instanceInfo.getStatus().name(), instanceInfo.getActionType().name());
                 Application app = applicationInstancesMap.get(instanceInfo.getAppName());
                 if (app == null) {
                     app = new Application(instanceInfo.getAppName());
