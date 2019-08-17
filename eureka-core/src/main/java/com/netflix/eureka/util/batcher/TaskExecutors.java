@@ -93,6 +93,9 @@ class TaskExecutors<ID, T> {
         @Monitor(name = METRIC_REPLICATION_PREFIX + "numberOfPermanentErrors", description = "Number of permanent task execution errors", type = DataSourceType.COUNTER)
         volatile long numberOfPermanentError;
 
+        @Monitor(name = METRIC_REPLICATION_PREFIX + "numberOfCongestionIssues", description = "Number of congestion issues during task execution", type = DataSourceType.COUNTER)
+        volatile long numberOfCongestionIssues;
+
         final StatsTimer taskWaitingTimeForProcessing;
 
         TaskExecutorMetrics(String id) {
@@ -122,6 +125,9 @@ class TaskExecutors<ID, T> {
                     break;
                 case PermanentError:
                     numberOfPermanentError += count;
+                    break;
+                case Congestion:
+                    numberOfCongestionIssues += count;
                     break;
             }
         }
@@ -211,7 +217,7 @@ class TaskExecutors<ID, T> {
             do {
                 result = workQueue.poll(1, TimeUnit.SECONDS);
             } while (!isShutdown.get() && result == null);
-            return result;
+            return (result == null) ? new ArrayList<>() : result;
         }
 
         private List<T> getTasksOf(List<TaskHolder<ID, T>> holders) {

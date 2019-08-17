@@ -18,7 +18,6 @@ import com.netflix.appinfo.ApplicationInfoManager;
 import com.netflix.appinfo.InstanceInfo;
 import com.netflix.discovery.EurekaClientConfig;
 import com.netflix.discovery.endpoint.EndpointUtils;
-import com.netflix.discovery.shared.Application;
 import com.netflix.eureka.EurekaServerConfig;
 import com.netflix.eureka.registry.PeerAwareInstanceRegistry;
 import com.netflix.eureka.resources.ServerCodecs;
@@ -233,6 +232,10 @@ public class PeerEurekaNodes {
      *         replicate, false otherwise.
      */
     public boolean isThisMyUrl(String url) {
+        final String myUrlConfigured = serverConfig.getMyUrl();
+        if (myUrlConfigured != null) {
+            return myUrlConfigured.equals(url);
+        }
         return isInstanceURL(url, applicationInfoManager.getInfo());
     }
     
